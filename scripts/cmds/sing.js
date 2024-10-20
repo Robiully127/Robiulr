@@ -131,10 +131,14 @@ convertHMS: function(value) {
         author: "Vex_Kshitiz",
         countDown: 10,
         role: 0,
-        shortDescription: "play audio from youtube",
-        longDescription: "play audio from youtube support audio recognition.",
-        category: "music",
-        guide: "{p} audio videoname / reply to audio or video" 
+        shortDescription: "example",
+        longDescription: "example",
+        category: "Media",
+        guide: " "axios":"",
+    "fs":"",
+    "nayan-media-downloader":"",
+	  "ytdl-core":"",
+    "simple-youtube-api":""" 
     },
 onStart: function ({ nayan, events, args }) {
         return video(nayan, events, args });
