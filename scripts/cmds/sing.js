@@ -1,19 +1,54 @@
-const axios = require("axios");
-const fs = require('fs-extra');
-const path = require('path');
-const { getStreamFromURL, shortenURL, randomString } = global.utils;
+const fs = require('fs');
+const ytdl = require('ytdl-core');
+const { resolve } = require('path');
+const nayan = require("nayan-media-downloader")
+const axios = require("axios")
+async function downloadMusicFromYoutube(link, path) {
+  if (!link) return 'Link Not Found';
 
-const API_KEYS = [
-    'b38444b5b7mshc6ce6bcd5c9e446p154fa1jsn7bbcfb025b3b',
-        '719775e815msh65471c929a0203bp10fe44jsndcb70c04bc42',
+  const timestart = Date.now();
 
-        'a2743acb5amsh6ac9c5c61aada87p156ebcjsnd25f1ef87037',
-        '8e938a48bdmshcf5ccdacbd62b60p1bffa7jsn23b2515c852d',
-        'f9649271b8mshae610e65f24780cp1fff43jsn808620779631',
-        '8e906ff706msh33ffb3d489a561ap108b70jsne55d8d497698',
+  try {
+    const data = await nayan.ytdown(link);
+    console.log(data)
+    const audioUrl = data.data.video;
 
-        '4bd76967f9msh2ba46c8cf871b4ep1eab38jsn19c9067a90bb',
-];
+    return new Promise((resolve, reject) => {
+      axios({
+        method: 'get',
+        url: audioUrl,
+        responseType: 'stream'
+      }).then(response => {
+        const writeStream = fs.createWriteStream(path);
+
+        response.data.pipe(writeStream)
+          .on('finish', async () => {
+            try {
+              const info = await ytdl.getInfo(link);
+              const result = {
+                title: info.videoDetails.title,
+                dur: Number(info.videoDetails.lengthSeconds),
+                viewCount: info.videoDetails.viewCount,
+                likes: info.videoDetails.likes,
+                author: info.videoDetails.author.name,
+                timestart: timestart
+              };
+              resolve(result);
+            } catch (error) {
+              reject(error);
+            }
+          })
+          .on('error', (error) => {
+            reject(error);
+          });
+      }).catch(error => {
+        reject(error);
+      });
+    });
+  } catch (error) {
+    return Promise.reject(error);
+  }
+}
 
 async function video(api, event, args, message) {
 handleReply: async function ({ api, event, handleReply }) {
