@@ -16,94 +16,83 @@ const API_KEYS = [
 ];
 
 async function video(api, event, args, message) {
-    api.setMessageReaction("🕢", event.messageID, (err) => {}, true);
+handleReply: async function ({ api, event, handleReply }) {
+    const axios = require('axios')
+    const { createReadStream, unlinkSync, statSync } = require("fs-extra")
     try {
-        let title = '';
-        let shortUrl = '';
-        let videoId = '';
-
-        const extractShortUrl = async () => {
-            const attachment = event.messageReply.attachments[0];
-            if (attachment.type === "video" || attachment.type === "audio") {
-                return attachment.url;
-            } else {
-                throw new Error("Invalid attachment type.");
-            }
-        };
-
-        const getRandomApiKey = () => {
-            const randomIndex = Math.floor(Math.random() * API_KEYS.length);
-            return API_KEYS[randomIndex];
-        };
-
-        if (event.messageReply && event.messageReply.attachments && event.messageReply.attachments.length > 0) {
-            shortUrl = await extractShortUrl();
-            const musicRecognitionResponse = await axios.get(`https://audio-recon-ahcw.onrender.com/kshitiz?url=${encodeURIComponent(shortUrl)}`);
-            title = musicRecognitionResponse.data.title;
-            const searchResponse = await axios.get(`https://youtube-kshitiz-gamma.vercel.app/yt?search=${encodeURIComponent(title)}`);
-            if (searchResponse.data.length > 0) {
-                videoId = searchResponse.data[0].videoId;
-            }
-
-            shortUrl = await shortenURL(shortUrl);
-        } else if (args.length === 0) {
-            message.reply("Please provide a video name or reply to a video or audio attachment.");
-            return;
-        } else {
-            title = args.join(" ");
-            const searchResponse = await axios.get(`https://youtube-kshitiz-gamma.vercel.app/yt?search=${encodeURIComponent(title)}`);
-            if (searchResponse.data.length > 0) {
-                videoId = searchResponse.data[0].videoId;
-            }
-
-            const videoUrlResponse = await axios.get(`https://yt-kshitiz.vercel.app/download?id=${encodeURIComponent(videoId)}&apikey=${getRandomApiKey()}`);
-            if (videoUrlResponse.data.length > 0) {
-                shortUrl = await shortenURL(videoUrlResponse.data[0]);
-            }
-        }
-
-        if (!videoId) {
-            message.reply("No video found for the given query.");
-            return;
-        }
-
-        const downloadResponse = await axios.get(`https://yt-kshitiz.vercel.app/download?id=${encodeURIComponent(videoId)}&apikey=${getRandomApiKey()}`);
-        const videoUrl = downloadResponse.data[0];
-
-        if (!videoUrl) {
-            message.reply("Failed to retrieve download link for the video.");
-            return;
-        }
-
-        const writer = fs.createWriteStream(path.join(__dirname, "cache", `${videoId}.mp3`));
-        const response = await axios({
-            url: videoUrl,
-            method: 'GET',
-            responseType: 'stream'
-        });
-
-        response.data.pipe(writer);
-
-        writer.on('finish', () => {
-            const videoStream = fs.createReadStream(path.join(__dirname, "cache", `${videoId}.mp3`));
-            message.reply({ body: `📹 Playing: ${title}`, attachment: videoStream });
-            api.setMessageReaction("✅", event.messageID, () => {}, true);
-        });
-
-        writer.on('error', (error) => {
-            console.error("Error:", error);
-            message.reply("Error downloading the video.");
-        });
-    } catch (error) {
-        console.error("Error:", error);
-        message.reply("An error occurred.");
+        var path = `${__dirname}/cache/1.mp3`
+        var data = await downloadMusicFromYoutube('https://www.youtube.com/watch?v=' + handleReply.link[event.body -1], path);
+        if (fs.statSync(path).size > 26214400) return api.sendMessage('The file cannot be sent because the capacity is greater than 25MB.', event.threadID, () => fs.unlinkSync(path), event.messageID);
+        api.unsendMessage(handleReply.messageID)
+        return api.sendMessage({ 
+		body: `🎵 Title: ${data.title}\n🎶 Name Channel : ${data.author}\n⏱️ Time: ${this.convertHMS(data.dur)}\n👀 Views: ${data.viewCount}\n🥰 Likes: ${data.likes}\n⏱️Processing time: ${Math.floor((Date.now()- data.timestart)/1000)} second\n💿====DISME PROJECT====💿`,
+            attachment: fs.createReadStream(path)}, event.threadID, ()=> fs.unlinkSync(path), 
+         event.messageID)
+            
     }
-}
+    catch (e) { return console.log(e) }
+},
+  
+convertHMS: function(value) {
+    const sec = parseInt(value, 10); 
+    let hours   = Math.floor(sec / 3600);
+    let minutes = Math.floor((sec - (hours * 3600)) / 60); 
+    let seconds = sec - (hours * 3600) - (minutes * 60); 
+    if (hours   < 10) {hours   = "0"+hours;}
+    if (minutes < 10) {minutes = "0"+minutes;}
+    if (seconds < 10) {seconds = "0"+seconds;}
+    return (hours != '00' ? hours +':': '') + minutes+':'+seconds;
+},
+  
+  start: async function ({ nayan, events, args }) {
+    if (args.length == 0 || !args) return nayan.reply('» উফফ আবাল কি গান শুনতে চাস তার ২/১ লাইন তো লেখবি নাকি 🥵 empty!', events.threadID, events.messageID);
+    const keywordSearch = args.join(" ");
+    var path = `${__dirname}/cache/1.mp3`
+    if (fs.existsSync(path)) { 
+        fs.unlinkSync(path)
+    }
+    if (args.join(" ").indexOf("https://") == 0) {
+        try {
+            var data = await downloadMusicFromYoutube(args.join(" "), path);
+            if (fs.statSync(path).size > 26214400) return nayan.reply('Unable to send files because the capacity is greater than 25MB .', events.threadID, () => fs.unlinkSync(path), events.messageID);
+            return nayan.reply({ 
+                body: `🎵 Title: ${data.title}\n🎶 Name Channel: ${data.author}\n⏱️ Time: ${this.convertHMS(data.dur)}\n👀 Views: ${data.viewCount}\n👍 Likes: ${data.likes}\n⏱️ Processing time: ${Math.floor((Date.now()- data.timestart)/1000)} second\n💿====DISME PROJECT====💿`,
+                attachment: fs.createReadStream(path)}, events.threadID, ()=> fs.unlinkSync(path), 
+            events.messageID)
 
-module.exports = {
+        }
+        catch (e) { return console.log(e) }
+    } else {
+          try {
+            var link = [],
+                msg = "",
+                num = 0
+            const Youtube = require('youtube-search-api');
+            var data = (await Youtube.GetListByKeyword(keywordSearch, false,6)).items;
+            for (let value of data) {
+              link.push(value.id);
+              num = num+=1
+              msg += (`${num} - ${value.title} (${value.length.simpleText})\n\n`);
+            }
+            var body = `»🔎 There's ${link.length} the result coincides with your search keyword:\n\n${msg}» Reply(feedback) select one of the searches above `
+            return nayan.reply({
+              body: body
+            }, events.threadID, (error, info) => global.client.handleReply.push({
+              type: 'reply',
+              name: this.config.name,
+              messageID: info.messageID,
+              author: events.senderID,
+              link
+            }), events.messageID);
+          } catch(e) {
+            return nayan.reply('An error has occurred, please try again in a moment!!\n' + e, events.threadID, events.messageID);
+        }
+    }
+
+}module.exports = {
     config: {
         name: "sing", 
-        version: "1.0",
+        version: "1.0.0",
         author: "Vex_Kshitiz",
         countDown: 10,
         role: 0,
@@ -112,7 +101,7 @@ module.exports = {
         category: "music",
         guide: "{p} audio videoname / reply to audio or video" 
     },
-    onStart: function ({ api, event, args, message }) {
-        return video(api, event, args, message);
+onStart: function ({ nayan, events, args }) {
+        return video(nayan, events, args });
     }
 };
